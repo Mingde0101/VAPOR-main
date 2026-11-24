@@ -24,11 +24,11 @@ python -m mani_skill.utils.download_asset bridge_v2_real2sim -y
 | `SAPIEN_ROOT` | Active Python's platform site-packages | `sapien/` and compatible compiled runtime |
 | `MS_ASSET_DIR` | `<data>/robot_bench/maniskill_assets` | `data/robots/widowx/` and `data/tasks/bridge_v2_real2sim_dataset/` |
 
-For fixed references, supply an NPZ containing RGB `frames` in `[T,H,W,3]` order and a scalar `fps`. The policy uses the checkpoint and frozen encoders configured in the [main README](../../README.md).
+For fixed references, supply an NPZ containing RGB `frames` in `[T,H,W,3]` order and a scalar `fps`. For the command below, save the clip as `widowx_carrot_on_plate_seed_000.npz` in `<COSMOS3_HOME>/reference_videos/` (default `<data>/cosmos3/reference_videos/`), or pass its location with `--reference`. The policy uses the checkpoint and frozen encoders configured in the [main README](../../README.md).
 
 ```bash
 python evaluation/simpler/run_simpler_with_reference.py \
-  --task-name widowx_carrot_on_plate --seeds 0 --reference /mnt/references/carrot-seed0.npz
+  --task-name widowx_carrot_on_plate --seeds 0
 ```
 
 ## Rolling Cosmos references

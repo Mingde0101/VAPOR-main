@@ -28,6 +28,7 @@ try:
 except ImportError:  # pragma: no cover - tqdm is optional at runtime.
     tqdm = None
 
+from scripts.build_bridge_valid_episode_index import file_sha256
 from lang_slot.paths import check_policy_files
 from lang_slot.training.policy_data import build_policy_dataloader
 from lang_slot.data import policy_episode_index_path
@@ -271,24 +272,34 @@ def normalized_shard_indices(config: Dict[str, Any]) -> Optional[list[int]]:
     return None if parsed is None else [int(index) for index in parsed]
 
 
-def validate_resume_cursor(
-    cursor: Optional[Dict[str, Any]],
-    config: Dict[str, Any],
-) -> Optional[Dict[str, Any]]:
-    if not cursor:
-        return None
+def cursor_data_settings(config: Dict[str, Any]) -> Dict[str, Any]:
     data_cfg = config.get("data", {})
-    expected = {
-        "split": data_cfg.get("split", "train"),
+    split = data_cfg.get("split", "train")
+    index = policy_episode_index_path(data_cfg, split)
+    return {
+        "split": split,
         "seed": int(get_nested(config, "experiment.seed", 0)),
         "shuffle_shards": bool(data_cfg.get("shuffle_shards", True)),
         "shard_indices": normalized_shard_indices(config),
         "valid_trajectories_only": bool(data_cfg.get("valid_trajectories_only", False)),
-        "episode_index_path": policy_episode_index_path(
-            data_cfg,
-            str(data_cfg.get("split", "train")),
-        ),
+        "episode_index_sha256": file_sha256(Path(index)) if index else None,
     }
+
+
+def validate_resume_cursor(
+    cursor: Optional[Dict[str, Any]],
+    config: Dict[str, Any],
+    settings: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    if not cursor:
+        return None
+    data_cfg = config.get("data", {})
+    expected = settings
+    if "episode_index_sha256" not in cursor:
+        # Older mid-epoch checkpoints recorded only the index path.
+        expected = settings.copy()
+        del expected["episode_index_sha256"]
+        expected["episode_index_path"] = policy_episode_index_path(data_cfg, settings["split"])
     for key, value in expected.items():
         if cursor.get(key) != value:
             print(
@@ -305,24 +316,15 @@ def validate_resume_cursor(
 
 def data_cursor_from_batch(
     batch: Dict[str, Any],
-    config: Dict[str, Any],
+    settings: Dict[str, Any],
     *,
     epoch: int,
     global_step: int,
     samples_seen: int,
 ) -> Dict[str, Any]:
-    data_cfg = config.get("data", {})
     last = -1
     return {
-        "split": data_cfg.get("split", "train"),
-        "seed": int(get_nested(config, "experiment.seed", 0)),
-        "shuffle_shards": bool(data_cfg.get("shuffle_shards", True)),
-        "shard_indices": normalized_shard_indices(config),
-        "valid_trajectories_only": bool(data_cfg.get("valid_trajectories_only", False)),
-        "episode_index_path": policy_episode_index_path(
-            data_cfg,
-            str(data_cfg.get("split", "train")),
-        ),
+        **settings,
         "shard_index": int(batch["shard_index"][last].detach().cpu()),
         "trajectory_index": int(batch["trajectory_index"][last].detach().cpu()),
         "timestep": int(batch["timestep"][last].detach().cpu()),
@@ -571,6 +573,7 @@ def main() -> None:
     args = build_argparser().parse_args()
     config = apply_overrides(load_yaml_config(args.config), args)
     check_policy_files(config, checkpoint=config["training"].get("resume"), split=config["data"]["split"])
+    cursor_settings = cursor_data_settings(config)
     output_dir = Path(get_nested(config, "experiment.output_dir"))
     output_dir.mkdir(parents=True, exist_ok=True)
     save_yaml_config(config, str(output_dir / "config_resolved.yaml"))
@@ -649,7 +652,7 @@ def main() -> None:
         global_step = int(checkpoint.get("global_step", 0))
         samples_seen = int(checkpoint.get("samples_seen", 0))
         epoch = int(checkpoint.get("epoch", 0))
-        data_cursor = validate_resume_cursor(checkpoint.get("data_cursor"), config)
+        data_cursor = validate_resume_cursor(checkpoint.get("data_cursor"), config, cursor_settings)
         print(
             f"[resume] path={resume_path} step={global_step} samples_seen={samples_seen} "
             f"loaded_tensors={checkpoint.get('loaded_trainable_tensors')}",
@@ -781,7 +784,7 @@ def main() -> None:
             global_step += 1
             data_cursor = data_cursor_from_batch(
                 batch,
-                config,
+                cursor_settings,
                 epoch=epoch,
                 global_step=global_step,
                 samples_seen=samples_seen,

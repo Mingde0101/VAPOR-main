@@ -26,7 +26,7 @@ Run commands from the repository root. Place the original Bridge TFDS files, the
 | `POLICY_OUTPUT_DIR` | `<data>/outputs` |
 | `POLICY_CHECKPOINT` | `<outputs>/stage2/checkpoints/latest.pt` for inference and evaluation |
 
-Set a shared root with e.g. `export SLOT_ATTENTION_VIDEO_DATA_DIR=/mnt/data`. Each individual override takes precedence. Third-party source, models, TFRecords, generated indices and run outputs live outside Git. The same Bridge settings apply to preparation, training and both evaluation representations.
+To use an existing data tree, set `SLOT_ATTENTION_VIDEO_DATA_DIR` to its root before running the commands. Each individual override takes precedence. Third-party source, models, TFRecords, generated indices and run outputs live outside Git. The same Bridge settings apply to preparation, training and both evaluation representations.
 
 ## Prepare Bridge and train
 
@@ -50,7 +50,7 @@ The slot modules start from their model initialization. Both stages train the sl
 | 1 | 1 | 0.00005, linear warmup over 1,000 updates | 41,707 | 1,334,619 |
 | 2 | 2 and 3 | 0.000025 | 125,121 | 4,003,857 |
 
-Stage 2 reads the stage 1 checkpoint and restores the optimizer, random state and global step. Both later epochs use the same learning rate, so they share one continuation configuration. The warmup uses the cumulative step. The epoch limit controls termination for both configs. [Stage 1](configs/stage1.yaml) · [Stage 2](configs/stage2.yaml)
+Stage 2 reads the stage 1 checkpoint and restores the optimizer, random state and global step. Both later epochs use the same learning rate, so they share one continuation configuration. The warmup uses the cumulative step. Mid-epoch checkpoints from this release identify the episode index by SHA-256, so the index and checkpoint can move together. Older mid-epoch checkpoints use the original index path to verify the data cursor. The epoch limit controls termination for both configs. [Stage 1](configs/stage1.yaml) · [Stage 2](configs/stage2.yaml)
 
 At anchor `t`, the model uses four history frames and a future reference clip from `t` to `t+4`. The first six action labels are adjacent differences in the recorded XYZ position and XYZ Euler state. The seventh comes from the recorded gripper command. All seven state components and the six motion deltas use their respective train z-scores. The gripper action keeps its original scale. End padding is masked. The included normalization snapshot was fitted on the **original train split** of 53,192 trajectories. To recompute it, run `python scripts/compute_bridge_policy_norm_stats.py --reader tfrecord`. [Normalization snapshot](configs/bridge_1_0_0_train_state_delta_action_norm_stats.json)
 
