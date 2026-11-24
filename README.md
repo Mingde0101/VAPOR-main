@@ -1,4 +1,4 @@
-# Bridge language-conditioned slot policy
+# VAPOR: A Video-to-Action Policy with Object-Centric Learning for Robot Manipulation
 
 Train a flow-matching action policy on Bridge 1.0.0 using frozen V-JEPA 2.1 and SigLIP 2 encoders. The policy learns semantic slots, fuses video, text and proprioception, and predicts four 7D actions per window.
 
