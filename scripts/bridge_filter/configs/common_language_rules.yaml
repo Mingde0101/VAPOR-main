@@ -1,0 +1,156 @@
+version: 1
+config_type: common_language_rules
+
+# These paths identify autonomous scripted rollouts. They are excluded from
+# candidate outputs, but still remain visible in the full manifest.
+exclude_path_substrings:
+  - /scripted_numpy_256/
+
+validity:
+  # Only high-precision meta-comment patterns belong here. A match is rejected
+  # as invalid. Unknown wording is sent to review instead of being discarded.
+  meta_comment_patterns:
+    - '\b(?:picture|pictures|image|images|photo|photos)\b.{0,40}\b(?:not working|aren.t working|isn.t working|broken|missing|unavailable)\b'
+    - '\b(?:can(?:not|\x27t)|unable to)\s+(?:see|tell|view|load)\b'
+    - '\b(?:these|the)\s+(?:picture|pictures|image|images)\b.{0,30}\b(?:wrong|bad|broken)\b'
+    - '^(?:n/?a|none|unknown|unclear|invalid|error)$'
+    - '^no\s+(?:picture|image|video)(?:s)?$'
+
+# The lexicon is deliberately editable. It is a high-recall inventory used to
+# find semantic slots, not a claim that every phrase has been fully understood.
+actions:
+  placement:
+    - put
+    - puts
+    - putting
+    - place
+    - places
+    - placed
+    - placing
+    - set
+    - lay
+    - drop
+    - insert
+    - deposit
+  removal:
+    - take
+    - takes
+    - took
+    - taking
+    - take out
+    - remove
+    - removes
+    - removed
+    - removing
+    - retrieve
+    - pick
+    - picks
+    - picked
+    - picking
+    - pick up
+    - picked up
+    - picking up
+    - lift
+    - extract
+    - pull out
+  movement:
+    - move
+    - moves
+    - moved
+    - moving
+    - transfer
+    - relocate
+    - bring
+  pushing:
+    - push
+    - slide
+    - shove
+  opening:
+    - open
+  closing:
+    - close
+    - shut
+  folding:
+    - fold
+    - unfold
+  sweeping:
+    - sweep
+  wiping:
+    - wipe
+  stacking:
+    - stack
+    - stacks
+    - stacked
+    - stacking
+    - unstack
+  turning:
+    - turn
+    - twist
+    - rotate
+  reorienting:
+    - flip
+    - topple
+    - upright
+    - reorient
+  zipping:
+    - zip
+    - unzip
+  pouring:
+    - pour
+
+relations:
+  "on":
+    - on the top of
+    - on top of
+    - on top
+    - onto
+    - atop
+    - "on"
+  "off":
+    - off of
+    - "off"
+  "in":
+    - inside of
+    - inside
+    - into
+    - within
+    - in
+  out_of:
+    - out of
+    - from inside
+  "to":
+    - towards
+    - toward
+    - to
+  "from":
+    - away from
+    - from
+  beside:
+    - next to
+    - beside
+    - near
+  under:
+    - underneath
+    - below
+    - under
+  between:
+    - between
+  behind:
+    - behind
+  in_front_of:
+    - in front of
+    - in front
+  above:
+    - above
+  beneath:
+    - beneath
+  "at":
+    - "at"
+  left_of:
+    - left of
+  right_of:
+    - right of
+  "with":
+    - "with"
+
+# 具体实体和任务方向不放在这个文件中；请到 configs/tasks/<task_name>.yaml。

@@ -1,0 +1,9 @@
+extends: stage1.yaml
+data:
+  split: val
+  shuffle_shards: false
+  batch_size: 4
+vjepa2:
+  window_batch_size: 2
+validation:
+  split: val

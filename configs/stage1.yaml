@@ -1,0 +1,140 @@
+paths:
+  work_dir: ${REPO}
+  data_dir: ${DATA}
+experiment:
+  name: bridge_vjepa2_1_slot_state_delta
+  output_dir: ${POLICY_OUTPUT_DIR}/stage1
+  seed: 0
+data:
+  path: ${BRIDGE_DATASET_DIR}
+  split: train
+  history_frames: 4
+  future_steps: 4
+  state_delta_action: true
+  normalize_state_action: true
+  normalization_stats_path: ${REPO}/configs/bridge_1_0_0_train_state_delta_action_norm_stats.json
+  normalization_eps: 1.0e-06
+  include_terminate_action: false
+  batch_size: 32
+  num_workers: 0
+  shard_indices: null
+  shuffle_shards: true
+  valid_trajectories_only: true
+  valid_trajectory_index_paths:
+    train: ${BRIDGE_INDEX_DIR}/bridge_1_0_0_train_semantic_valid_v1.npz
+    val: ${BRIDGE_INDEX_DIR}/bridge_1_0_0_val_semantic_valid_v1.npz
+text:
+  model_dir: ${SIGLIP2_DIR}
+  embedding_dim: 1536
+  num_slots: 5
+  torch_dtype: bf16
+  freeze: true
+vjepa2:
+  tubelet_size: 2
+  image_size: 384
+  resize_shortest_edge: 438
+  patch_size: 16
+  hidden_size: 1024
+  torch_dtype: bf16
+  freeze: true
+  window_batch_size: 16
+  backend: vjepa2_1
+  repo_dir: ${VJEPA2_REPO_DIR}
+  checkpoint: ${VJEPA2_CHECKPOINT}
+  checkpoint_key: ema_encoder
+  pretrained: true
+  num_frames: 64
+slot:
+  input_dim: 1024
+  slot_dim: 256
+  num_slots: 5
+  num_iterations: 3
+  num_patches: 576
+  query_dim: 1536
+  predictor_type: transformer
+  num_predictor_layers: 1
+  num_predictor_heads: 4
+  slot_mlp_hidden_dim: 512
+  decoder_hidden_dim: 2048
+  decoder_num_layers: 3
+  embedding_dim: 4096
+  use_flow: false
+  freeze: false
+  recon_loss_weight: 0.3
+  contrastive_loss_weight: 0.2
+  contrastive_matching: hungarian
+  compute_auxiliary_loss: true
+  auxiliary_loss_weight: 1.0
+condition_fusion:
+  d_video: 1024
+  d_state: 7
+  d_action: 7
+  d_slot: 256
+  d_text: 1536
+  d_model: 512
+  num_layers: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0
+  max_hist_len: 4
+  max_future_len: 4
+  max_spatial_h: 24
+  max_spatial_w: 24
+action_decoder:
+  action_dim: 7
+  action_horizon: 4
+  condition_dim: 512
+  d_model: 512
+  num_layers: 4
+  num_heads: 8
+  mlp_ratio: 4.0
+  dropout: 0.0
+  loss_type: mse
+  flow_time_eps: 0.0001
+  sample_steps: 20
+  discretize_gripper: false
+  gripper_index: 6
+  gripper_threshold: 0.5
+partial_init:
+  checkpoint: null
+  include_prefixes: []
+  exclude_prefixes: []
+  strict_shapes: true
+optimizer:
+  class: AdamW
+  lr: 5.0e-05
+  warmup_steps: 1000
+  weight_decay: 0.01
+  betas:
+  - 0.9
+  - 0.95
+  eps: 1.0e-08
+training:
+  device: cuda
+  max_steps: 10000
+  max_epochs: 1
+  grad_accum_steps: 1
+  precision: bf16
+  grad_clip_norm: 1.0
+  log_every: 10
+  save_every: 1000
+  sample_every: 0
+  sample_log_batch_size: 8
+  keep_step_checkpoints: false
+  resume: null
+  auto_resume: false
+  skip_seen_on_resume: false
+tensorboard:
+  enabled: true
+  log_dir: null
+  step_log_every: 10
+  histogram_every: 100
+  flush_secs: 30
+  port: 6006
+validation:
+  split: train
+  shard_index: 0
+  batch_size: 1
+  max_batches: 8
+  sample_steps: 10
+  output_jsonl: validation_predictions.jsonl

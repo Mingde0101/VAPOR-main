@@ -1,0 +1,68 @@
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+
+# Training outputs and logs
+/outputs/
+/checkpoints/
+/runs/
+/tb_logs/
+/wandb/
+/tensorboard/
+/results/
+/reference_videos/
+/serve_outputs/
+/rolling_cosmos_references/
+/rolling_cosmos_results/
+events.out.tfevents.*
+train_log.jsonl
+samples_original_actions.jsonl
+validation_predictions.jsonl
+config_resolved.yaml
+*.log
+
+# Model weights and local model links
+/pretrained_models/
+/models/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+
+# Datasets and generated feature files
+/shared_data/
+/datasets/
+/dataset_cache/
+/Bridge/
+/maniskill_assets/
+*.tfrecord
+*.tfrecord-*
+*.npz
+*.npy
+*.mp4
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+/data/
+/external/
+/.cache/

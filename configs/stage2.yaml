@@ -1,0 +1,8 @@
+extends: stage1.yaml
+experiment:
+  output_dir: ${POLICY_OUTPUT_DIR}/stage2
+optimizer:
+  lr: 2.5e-05
+training:
+  max_epochs: 3
+  resume: ${POLICY_OUTPUT_DIR}/stage1/checkpoints/latest.pt
