@@ -1,13 +1,12 @@
-"""Bridge 指令的纯文本规则引擎。
+"""Text rules for Bridge instructions.
 
-这个文件不读取 TFRecord，也不处理图像。它只完成三件事：
+Normalize ``language_instruction``, flag empty instructions and annotation
+comments as invalid, and mark uncertain wording for review. Task queries use
+entity, action, and relation rules to identify strict, broad, and partial matches.
 
-1. 规范化 ``language_instruction``；
-2. 将空语义、明确的元话语标成 invalid，将无法确认的表达标成 review；
-3. 根据任务 YAML 中的实体、动作和关系规则产生 strict/broad/partial 匹配。
-
-TFRecord 扫描和结果落盘位于 ``filter_bridge_task.py``。把规则引擎与数据 I/O
-分开，便于用单元测试验证语义规则，也便于未来复用到其他格式的数据集。
+The scanner in ``scripts/prepare_bridge.py`` reads TFRecords and writes the
+results. Keeping I/O in the scanner lets these rules run in isolation in tests
+and on instructions from other dataset formats.
 """
 
 from __future__ import annotations
@@ -24,10 +23,10 @@ _SPACE = re.compile(r"\s+")
 
 
 def normalize_instruction(text: str) -> str:
-    """保守地规范化英文指令，同时保留决定方向的单词。
+    """Normalize English instructions while preserving directional words.
 
-    这里只处理大小写、Unicode、下划线/连字符、标点和多余空格；不会删除
-    ``on/off/from/in`` 等对任务方向至关重要的词。
+    Standardize Unicode, case, separators, punctuation, and whitespace. Keep
+    words such as ``on``, ``off``, ``from``, and ``in`` because they specify direction.
     """
     text = unicodedata.normalize("NFKC", text or "").translate(_APOSTROPHES)
     text = text.replace("_", "-").lower()
@@ -45,7 +44,7 @@ def _phrase_pattern(phrase: str) -> re.Pattern[str]:
 
 @dataclass(frozen=True)
 class Hit:
-    """一个词典短语在规范化指令中的命中位置。"""
+    """A lexicon phrase and its span in the normalized instruction."""
     category: str
     phrase: str
     start: int
@@ -61,9 +60,9 @@ class Hit:
 
 
 class PhraseLexicon:
-    """将 YAML 中按类别组织的短语编译为可复用的正则词典。
+    """Compile YAML phrase categories into reusable regular expressions.
 
-    当 ``pick`` 和 ``pick up`` 等短语重叠时，优先保留更长的短语。
+    Prefer longer phrases when matches overlap, such as ``pick up`` and ``pick``.
     """
 
     def __init__(self, categories: Mapping[str, Sequence[str]]):
@@ -89,7 +88,7 @@ class PhraseLexicon:
 
 
 def _term_hits(text: str, terms: Iterable[str], category: str) -> list[Hit]:
-    """查找任务配置中的实体词，例如 carrot、plate。"""
+    """Find entity terms from the task configuration, such as carrot and plate."""
     hits: list[Hit] = []
     for term in sorted(set(terms), key=lambda value: (-len(value), value)):
         phrase = normalize_instruction(term)
@@ -99,7 +98,7 @@ def _term_hits(text: str, terms: Iterable[str], category: str) -> list[Hit]:
 
 
 def _split_clauses(text: str, actions: PhraseLexicon) -> list[str]:
-    """只切分明确的连续动作子句，避免误切 ``between X and Y``。"""
+    """Split sequences of actions while keeping phrases such as ``between X and Y`` intact."""
     rough = [part.strip() for part in re.split(r"\s*;\s*|\b(?:and then|then)\b", text) if part.strip()]
     clauses: list[str] = []
     for part in rough:
@@ -120,7 +119,7 @@ def _split_clauses(text: str, actions: PhraseLexicon) -> list[str]:
 
 
 class LanguageAnalyzer:
-    """执行指令有效性判断、语义槽位抽取和任务查询匹配。"""
+    """Assess instruction validity, extract semantic slots, and match task queries."""
 
     def __init__(self, config: Mapping[str, Any]):
         self.config = config
@@ -132,15 +131,11 @@ class LanguageAnalyzer:
         ]
 
     def analyze(self, raw_text: str) -> dict[str, Any]:
-        """判断一条指令是否有效，并抽取动作、关系和子句。
+        """Assess instruction validity and extract actions, relations, and clauses.
 
-        ``validity`` 有三种结果：
-
-        - ``valid``：存在已知动作，且没有命中无效规则；
-        - ``invalid``：空语义或高置信度元话语；
-        - ``review``：可能有效，但当前词典无法可靠识别动作/编码。
-
-        只有 high-precision 情况会直接 invalid，未知表达不会静默丢弃。
+        - ``valid`` indicates a recognized action with no quality issues.
+        - ``invalid`` indicates empty text or a recognized annotation comment.
+        - ``review`` flags unfamiliar action wording or a possible encoding issue.
         """
         text = normalize_instruction(raw_text)
         reasons: list[str] = []
@@ -187,19 +182,21 @@ class LanguageAnalyzer:
         }
 
     def match_query(self, analysis: Mapping[str, Any], query: Mapping[str, Any]) -> dict[str, Any]:
-        """把一条已分析指令与一个具名任务配置匹配。
+        """Match an analyzed instruction against a named task configuration.
 
-        匹配级别：
+        - A ``strict`` match requires an action, object, relation, and counterpart
+          in that order within one clause. The action and relation must agree on
+          direction.
+        - A ``broad`` match contains both entities, with ambiguous roles due to
+          pronouns, reversed word order, or other wording.
+        - The ``partial_candidate`` flag marks instructions containing both
+          entities with insufficient action or relation evidence for a match.
+        - A ``none`` match level means no strict or broad match was found.
 
-        - ``strict``：同一子句内满足 action -> object -> relation -> counterpart，
-          且动作类别与关系方向一致；
-        - ``broad``：实体齐全，但存在代词指代、词序反转或其他角色歧义；
-        - ``partial_candidate``：两个实体均出现，但动作/关系词典覆盖不足；
-        - ``none``：与该任务无关。
-
-        一个总任务也可以用 ``alternatives`` 包含多个互斥子任务。例如
-        ``simpler_pick_place`` 汇总四种 PnP 语义，但仍分别检查 spoon/towel、
-        carrot/plate 等实体角色，避免实体列表交叉组合造成误匹配。
+        A task can group mutually exclusive subtasks under ``alternatives``.
+        For example, ``simpler_pick_place`` groups four pick-and-place tasks.
+        Checking each entity pair separately keeps the spoon paired with the
+        towel and the carrot with the plate.
         """
         alternatives = query.get("alternatives", [])
         if alternatives:
@@ -329,12 +326,12 @@ class LanguageAnalyzer:
         }
 
         def query_actions(clause: str) -> list[Hit]:
-            """应用任务 YAML 的谓词白名单；空白名单表示使用全部通用谓词。"""
+            """Apply the task's allowed action phrases. An empty list allows all actions."""
             hits = self.actions.find(clause)
             return [hit for hit in hits if not allowed_action_phrases or hit.phrase in allowed_action_phrases]
 
         def query_relations(clause: str) -> list[Hit]:
-            """应用任务 YAML 的关系词白名单；方向仍由关系类别决定。"""
+            """Apply the task's allowed relation phrases. Relation categories determine direction."""
             hits = self.relations.find(clause)
             return [
                 hit for hit in hits if not allowed_relation_phrases or hit.phrase in allowed_relation_phrases
@@ -444,7 +441,7 @@ class LanguageAnalyzer:
         }
 
     def analyze_with_queries(self, raw_text: str) -> dict[str, Any]:
-        """一次分析文本，并依次执行当前加载的全部具名任务查询。"""
+        """Analyze the instruction once and run each configured task query on the result."""
         analysis = self.analyze(raw_text)
         analysis["queries"] = {
             name: self.match_query(analysis, query)

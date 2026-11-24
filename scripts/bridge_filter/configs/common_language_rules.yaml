@@ -153,4 +153,4 @@ relations:
   "with":
     - "with"
 
-# 具体实体和任务方向不放在这个文件中；请到 configs/tasks/<task_name>.yaml。
+# Each task query defines its own entities and the action and relation categories for each direction.
